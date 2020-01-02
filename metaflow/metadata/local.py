@@ -10,8 +10,8 @@ from .metadata import MetadataProvider
 class LocalMetadataProvider(MetadataProvider):
     TYPE = 'local'
 
-    def __init__(self, environment, flow, event_logger, monitor):
-        super(LocalMetadataProvider, self).__init__(environment, flow, event_logger, monitor)
+    def __init__(self, environment, flow, event_logger):
+        super(LocalMetadataProvider, self).__init__(environment, flow, event_logger)
 
     @classmethod
     def compute_info(cls, val):

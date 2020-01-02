@@ -4,6 +4,8 @@ import inspect
 import traceback
 from functools import partial, wraps
 from datetime import datetime
+import string 
+import random
 
 import click
 
@@ -89,15 +91,15 @@ def echo_always(line, **kwargs):
         click.secho(ERASE_TO_EOL, **kwargs)
 
 
-def logger(body='', system_msg=False, head='', bad=False, timestamp=True):
-    if timestamp:
-        tstamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-        click.secho(tstamp + ' ', fg=LOGGER_TIMESTAMP, nl=False)
-    if head:
-        click.secho(head, fg=LOGGER_COLOR, nl=False)
-    click.secho(body,
-                bold=system_msg,
-                fg=LOGGER_BAD_COLOR if bad else None)
+# def logger(body='', system_msg=False, head='', bad=False, timestamp=True):
+#     if timestamp:
+#         tstamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+#         click.secho(tstamp + ' ', fg=LOGGER_TIMESTAMP, nl=False)
+#     if head:
+#         click.secho(head, fg=LOGGER_COLOR, nl=False)
+#     click.secho(body,
+#                 bold=system_msg,
+#                 fg=LOGGER_BAD_COLOR if bad else None)
 
 
 @click.group()
@@ -411,9 +413,9 @@ def step(obj,
                         obj.datastore,
                         obj.metadata,
                         obj.environment,
-                        obj.logger,
-                        obj.event_logger,
-                        obj.monitor)
+                        obj.logger)
+                        # obj.event_logger,
+                        # obj.monitor)
     if clone_only:
         task.clone_only(step_name,
                         run_id,
@@ -562,6 +564,83 @@ def resume(obj,
 
 
 @parameters.add_custom_parameters
+@cli.command(help='Run the workflow locally triggering tasks(imitating google cloud functions)')
+@common_run_options
+@click.option('--namespace',
+              'user_namespace',
+              default=None,
+              help="Change namespace from the default (your username) to "
+                   "the specified tag. Note that this option does not alter "
+                   "tags assigned to the objects produced by this run, just "
+                   "what existing objects are visible in the client API. You "
+                   "can enable the global namespace with an empty string."
+                   "--namespace=")
+@click.pass_obj
+def run_trigger(obj,
+        tags=None,
+        max_workers=None,
+        max_num_splits=None,
+        max_log_size=None,
+        decospecs=None,
+        run_id_file=None,
+        user_namespace=None,
+        **kwargs):
+
+    if namespace is not None:
+        namespace(user_namespace or None)
+    before_run(obj, tags, decospecs + obj.environment.decospecs())
+    from diskcache import Deque
+    letters = string.ascii_lowercase
+    qpath = ''.join(random.choice(letters) for i in range(6))
+
+    QUEUE_PATH = "/tmp/"+qpath
+
+    dq = Deque(directory=QUEUE_PATH)
+    item = {
+        "flow": obj.flow.name,
+        #"flow": "TestForkJoin2",
+        "metadata" : obj.metadata.TYPE,
+        "environment": obj.environment.TYPE,
+        "datastore": obj.datastore.TYPE,
+        "datastore_root": None,
+        # "event_logger": obj.event_logger,
+        # "monitor": obj.monitor,
+        "step_name": "start",
+        "tags" : tags,
+        "run_id" : None,
+        "task_id": None,
+        "input_paths": None,
+        "split_index": None,
+        "user_namespace": user_namespace,
+        "retry_count": 0,
+        "max_user_code_retries": 100,
+        "clone_only": None,
+        "clone_run_id": None,
+        "clone_steps": None,
+        "join_type": None
+    }
+
+    for key, val in kwargs.items():
+        # print(key, val)
+        item[key] = val
+    
+    dq.append(item)
+
+    def deque_analyses_from_queue(dq):
+        #for item in dq:
+        return dq.popleft()
+    from .trigger_runtime import Runner
+    while dq:
+        trigger_args = deque_analyses_from_queue(dq)
+        # print(trigger_args["step_name"], trigger_args["input_paths"])
+        print(trigger_args)
+        runner = Runner(**trigger_args)
+        out_triggers = runner.execute()
+        for out_trigger in out_triggers:
+            dq.append(out_trigger)
+
+
+@parameters.add_custom_parameters
 @cli.command(help='Run the workflow locally.')
 @common_run_options
 @click.option('--namespace',
@@ -596,8 +675,8 @@ def run(obj,
                             obj.package,
                             obj.logger,
                             obj.entrypoint,
-                            obj.event_logger,
-                            obj.monitor,
+                            # obj.event_logger,
+                            # obj.monitor,
                             max_workers=max_workers,
                             max_num_splits=max_num_splits,
                             max_log_size=max_log_size * 1024 * 1024)
@@ -694,16 +773,16 @@ def version(obj):
               default=False,
               show_default=True,
               help='Measure code coverage using coverage.py.')
-@click.option('--event-logger',
-              default='nullSidecarLogger',
-              show_default=True,
-              type=click.Choice(LOGGING_SIDECAR),
-              help='type of event logger used')
-@click.option('--monitor',
-              default='nullSidecarMonitor',
-              show_default=True,
-              type=click.Choice(MONITOR_SIDECAR),
-              help='Monitoring backend type')
+# @click.option('--event-logger',
+#               default='nullSidecarLogger',
+#               show_default=True,
+#               type=click.Choice(LOGGING_SIDECAR),
+#               help='type of event logger used')
+# @click.option('--monitor',
+#               default='nullSidecarMonitor',
+#               show_default=True,
+#               type=click.Choice(MONITOR_SIDECAR),
+#               help='Monitoring backend type')
 @click.pass_context
 def start(ctx,
           quiet=False,
@@ -732,38 +811,108 @@ def start(ctx,
     if decospecs:
         decorators._attach_decorators(ctx.obj.flow, decospecs)
 
-    if coverage:
-        from coverage import Coverage
-        cov = Coverage(data_suffix=True,
-                       auto_data=True,
-                       source=['metaflow'],
-                       branch=True)
-        cov.start()
+    # if coverage:
+    #     from coverage import Coverage
+    #     cov = Coverage(data_suffix=True,
+    #                    auto_data=True,
+    #                    source=['metaflow'],
+    #                    branch=True)
+    #     cov.start()
 
     ctx.obj.echo = echo
     ctx.obj.echo_always = echo_always
     ctx.obj.graph = FlowGraph(ctx.obj.flow.__class__)
+    import logging
+
+    def add_stream_handler(logger, cmd):
+        
+        sh = logging.StreamHandler(sys.stdout)
+        sh.setLevel(logging.DEBUG)
+        # create formatter and add it to the handlers
+        if cmd in ["run", "run-trigger"]:
+            formatter = logging.Formatter('%(asctime)s - %(message)s')
+        elif cmd == "step":
+            formatter = logging.Formatter('%(message)s')
+
+        # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        sh.setFormatter(formatter)
+
+        def decorate_emit(fn):
+        # add methods we need to the class
+            def new(*args):
+                levelno = args[0].levelno
+                if(levelno >= logging.CRITICAL):
+                    color = '\x1b[31;1m'
+                elif(levelno >= logging.ERROR):
+                    color = '\x1b[31;1m'
+                elif(levelno >= logging.WARNING):
+                    color = '\x1b[33;1m'
+                elif(levelno >= logging.INFO):
+                    color = '\x1b[32;1m'
+                elif(levelno >= logging.DEBUG):
+                    color = '\x1b[35;1m'
+                else:
+                    color = '\x1b[0m'
+                msg = args[0].msg
+                args[0].msg = "{0}***\x1b[0m {1}".format(color, args[0].msg)
+                # if len(msg.split("|")) > 1:
+                #     msg0,msg1 = msg.split("|")
+                #     # add colored *** in the beginning of the message
+                #     args[0].msg = "{0}{1}\x1b[0m {2}".format(color, msg0, msg1)
+                # else:
+                #     args[0].msg = "{0}***\x1b[0m {1}".format(color, args[0].msg)
+
+                # new feature i like: bolder each args of message
+                args[0].args = tuple('\x1b[1m' + arg + '\x1b[0m' for arg in args[0].args)
+                return fn(*args)
+            return new
+        sh.emit = decorate_emit(sh.emit)
+        logger.addHandler(sh)
+
+    logger = logging.getLogger('metaflow.2')
+    logger.setLevel(logging.DEBUG)
+    # create file handler which logs even debug messages
+    if ctx.invoked_subcommand in ["run", "run-trigger"]:
+        fh = logging.FileHandler('console.log', mode='w')
+        formatter = logging.Formatter('%(asctime)s - %(message)s')
+    elif ctx.invoked_subcommand == "step":
+        fh = logging.FileHandler('console.log')
+        formatter = logging.Formatter('%(message)s')
+    
+    fh.setLevel(logging.DEBUG)
+    # create console handler with a higher log level
+    # ch = logging.StreamHandler(sys.stdout)
+    # ch.setLevel(logging.DEBUG)
+    # create formatter and add it to the handlers
+    
+    fh.setFormatter(formatter)
+    # ch.setFormatter(formatter)
+    # add the handlers to the logger
+    logger.addHandler(fh)
+    # logger.addHandler(ch)
+    add_stream_handler(logger,ctx.invoked_subcommand)
     ctx.obj.logger = logger
+    #ctx.obj.logger = None
     ctx.obj.check = _check
     ctx.obj.pylint = pylint
     ctx.obj.top_cli = cli
     ctx.obj.package_suffixes = package_suffixes.split(',')
     ctx.obj.reconstruct_cli = _reconstruct_cli
 
-    ctx.obj.event_logger = EventLogger(event_logger)
+    # ctx.obj.event_logger = EventLogger(event_logger)
 
     ctx.obj.environment = [e for e in ENVIRONMENTS + [MetaflowEnvironment]
                            if e.TYPE == environment][0](ctx.obj.flow)
     ctx.obj.environment.validate_environment(echo)
 
-    ctx.obj.monitor = Monitor(monitor, ctx.obj.environment, ctx.obj.flow.name)
-    ctx.obj.monitor.start()
+    # ctx.obj.monitor = Monitor(monitor, ctx.obj.environment, ctx.obj.flow.name)
+    # ctx.obj.monitor.start()
 
     ctx.obj.metadata = [m for m in METADATAPROVIDERS
                         if m.TYPE == metadata][0](ctx.obj.environment,
                                                   ctx.obj.flow,
-                                                  ctx.obj.event_logger,
-                                                  ctx.obj.monitor)
+                                                  ctx.obj.logger)
+                                                  #ctx.obj.monitor)
     ctx.obj.datastore = DATASTORES[datastore]
     ctx.obj.datastore_root = datastore_root
     if ctx.invoked_subcommand not in ('run', 'resume'):

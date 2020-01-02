@@ -30,16 +30,22 @@ class MetaflowTask(object):
                  datastore,
                  metadata,
                  environment,
-                 console_logger,
-                 event_logger,
-                 monitor):
+                 console_logger):
+                #  event_logger,
+                #  monitor):
+        print(console_logger)
         self.flow = flow
         self.datastore = datastore
         self.metadata = metadata
         self.environment = environment
+        #import logging
+        #self.console_logger = logging.getLogger(__name__)
+        #self.console_logger.info("#"*20)
+        #self.console_logger.info(__name__)
         self.console_logger = console_logger
-        self.event_logger = event_logger
-        self.monitor = monitor
+        # self.event_logger = event_logger
+        # self.monitor = monitor
+        print("LAALLALLALALALALALLALALALLALALALALLALA")
 
     def _exec_step_function(self, step_function, input_obj=None):
         self.environment.validate_environment(logger=self.console_logger)
@@ -84,8 +90,8 @@ class MetaflowTask(object):
                                      run_id,
                                      pathspecs=input_paths,
                                      metadata=self.metadata,
-                                     event_logger=self.event_logger,
-                                     monitor=self.monitor,
+                                     event_logger=self.console_logger,
+                                     #monitor=self.monitor,
                                      prefetch_data_artifacts=prefetch_data_artifacts)
             ds_list = [ds for ds in datastore_set]
             if len(ds_list) != len(input_paths):
@@ -103,8 +109,8 @@ class MetaflowTask(object):
                                    step_name=step_name,
                                    task_id=task_id,
                                    metadata=self.metadata,
-                                   event_logger=self.event_logger,
-                                   monitor=self.monitor))
+                                   event_logger=self.console_logger))
+                                #    monitor=self.monitor))
         if not ds_list:
             # this guards against errors in input paths
             raise MetaflowDataMissing("Input paths *%s* resolved to zero "
@@ -211,8 +217,8 @@ class MetaflowTask(object):
                                 mode='w',
                                 metadata=self.metadata,
                                 attempt=0,
-                                event_logger=self.event_logger,
-                                monitor=self.monitor)
+                                event_logger=self.console_logger)
+                                # monitor=self.monitor)
         origin_run_id, origin_step_name, origin_task_id =\
             clone_origin_task.split('/')
         # 2. initialize origin datastore
@@ -221,8 +227,8 @@ class MetaflowTask(object):
                                 step_name=origin_step_name,
                                 task_id=origin_task_id,
                                 metadata=self.metadata,
-                                event_logger=self.event_logger,
-                                monitor=self.monitor)
+                                event_logger=self.console_logger)
+                                # monitor=self.monitor)
         output.clone(origin)
         output.done()
 
@@ -274,8 +280,8 @@ class MetaflowTask(object):
                                 mode='w',
                                 metadata=self.metadata,
                                 attempt=retry_count,
-                                event_logger=self.event_logger,
-                                monitor=self.monitor)
+                                event_logger=self.console_logger)
+                                # monitor=self.monitor)
 
         if input_paths:
             # 2. initialize input datastores
@@ -300,11 +306,11 @@ class MetaflowTask(object):
             'code_package_url': os.environ.get('METAFLOW_CODE_URL'),
             'retry_count': retry_count
         })
-        logger = self.event_logger
+        logger = self.console_logger
         start = time.time()
         try:
             # init side cars
-            logger.start()
+            #logger.start()
 
             msg = {
                 "task_id": task_id,
@@ -314,7 +320,7 @@ class MetaflowTask(object):
                 "flow_name": self.flow.name,
                 "ts": round(time.time())
             }
-            logger.log(msg)
+            logger.info(msg)
 
             self.flow._current_step = step_name
             self.flow._success = False
@@ -428,7 +434,7 @@ class MetaflowTask(object):
                 "run_id": run_id,
                 "flow_name": self.flow.name
             }
-            logger.log(tsk_msg)
+            logger.info(tsk_msg)
 
             exception_handled = False
             for deco in decorators:
@@ -460,13 +466,13 @@ class MetaflowTask(object):
                 "ts": round(time.time()),
                 "runtime": round(end)
             }
-            logger.log(msg)
+            logger.info(msg)
 
             output.save_metadata('task_end', {})
             output.persist(self.flow)
 
             # terminate side cars
-            logger.terminate()
+            #logger.terminate()
 
             # this writes a success marker indicating that the
             # "transaction" is done

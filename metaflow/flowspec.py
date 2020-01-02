@@ -76,6 +76,9 @@ class FlowSpec(object):
             from . import cli
             cli.main(self)
 
+    def get_step(self, step_name):
+        return self._graph[step_name]
+
     @property
     def script_name(self):
         """

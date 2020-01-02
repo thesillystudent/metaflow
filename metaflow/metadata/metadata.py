@@ -468,13 +468,13 @@ class MetadataProvider(object):
             result = []
         return starting_point
 
-    def __init__(self, environment, flow, event_logger, monitor):
+    def __init__(self, environment, flow, event_logger):
         self._task_id_seq = -1
         self.sticky_tags = []
         self.sticky_sys_tags = []
         self._flow_name = flow.name
         self._event_logger = event_logger
-        self._monitor = monitor
+        # self._monitor = monitor
         self._environment = environment
         self._runtime = os.environ.get(
             'METAFLOW_MLI_RUNTIME_NAME', 'dev')

@@ -80,15 +80,15 @@ def check_that_end_is_end(graph):
     if node.num_args > 1:
         raise LintWarn(msg1, node.tail_next_lineno)
 
-@linter.ensure_fundamentals
-@linter.check
-def check_step_names(graph):
-    msg =\
-    "Step *{0.name}* has an invalid name. Only lowercase ascii "\
-    "characters, underscores, and digits are allowed."
-    for node in graph:
-        if re.search('[^a-z0-9_]', node.name) or node.name[0] == '_':
-            raise LintWarn(msg.format(node), node.func_lineno)
+#@linter.ensure_fundamentals
+#@linter.check
+#def check_step_names(graph):
+#    msg =\
+#    "Step *{0.name}* has an invalid name. Only lowercase ascii "\
+#    "characters, underscores, and digits are allowed."
+#    for node in graph:
+#        if re.search('[^a-z0-9_]', node.name) or node.name[0] == '_':
+#            raise LintWarn(msg.format(node), node.func_lineno)
 
 @linter.ensure_fundamentals
 @linter.check

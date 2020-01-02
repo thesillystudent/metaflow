@@ -135,8 +135,9 @@ class FlowGraph(object):
         self._postprocess()
 
     def _create_nodes(self, flow):
-        module = __import__(flow.__module__)
-        tree = ast.parse(inspect.getsource(module)).body
+        # module = __import__(flow.__module__)
+        # tree = ast.parse(inspect.getsource(module)).body
+        tree = ast.parse(inspect.getsource(flow)).body
         root = [n for n in tree\
                 if isinstance(n, ast.ClassDef) and n.name == self.name][0]
         nodes = {}

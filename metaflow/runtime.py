@@ -56,8 +56,8 @@ class NativeRuntime(object):
                  package,
                  logger,
                  entrypoint,
-                 event_logger,
-                 monitor,
+                #  event_logger,
+                #  monitor,
                  run_id=None,
                  clone_run_id=None,
                  clone_steps=None,
@@ -83,8 +83,8 @@ class NativeRuntime(object):
         self._max_log_size = max_log_size
         self._params_task = None
         self._entrypoint = entrypoint
-        self.event_logger = event_logger
-        self._monitor = monitor
+        #self.event_logger = event_logger
+        # self._monitor = monitor
 
         self._clone_run_id = clone_run_id
         self._clone_steps = {} if clone_steps is None else clone_steps
@@ -118,7 +118,8 @@ class NativeRuntime(object):
                     flow.name,
                     clone_run_id,
                     metadata=metadata,
-                    event_logger=event_logger,
+                    logger=logger,
+                    # event_logger=event_logger,
                     monitor=monitor,
                     prefetch_data_artifacts=PREFETCH_DATA_ARTIFACTS)
         self._run_queue = []
@@ -156,8 +157,8 @@ class NativeRuntime(object):
                     self._metadata,
                     self._environment,
                     self._entrypoint,
-                    self.event_logger,
-                    self._monitor,
+                    # self.event_logger,
+                    # self._monitor,
                     input_paths=input_paths,
                     may_clone=may_clone,
                     clone_run_id=self._clone_run_id,
@@ -179,8 +180,7 @@ class NativeRuntime(object):
 
     def execute(self):
 
-        self._logger('Workflow starting (run-id %s):' % self._run_id,
-                     system_msg=True)
+        self._logger.info('Workflow starting (run-id %s):' % self._run_id)
 
         if self._params_task:
             self._queue_push('start', {'input_paths': [self._params_task]})
@@ -212,15 +212,15 @@ class NativeRuntime(object):
                     self._logger(msg, system_msg=True)
                     msg = "%d steps are pending: %s." %\
                           (0, 'e.g. ...')  # TODO
-                    self._logger(msg, system_msg=True)
+                    self._logger.info(msg)
 
         except KeyboardInterrupt as ex:
-            self._logger('Workflow interrupted.', system_msg=True, bad=True)
+            self._logger.exception('Workflow interrupted.')
             self._killall()
             exception = ex
             raise
         except Exception as ex:
-            self._logger('Workflow failed.', system_msg=True, bad=True)
+            self._logger.exception('Workflow failed.')
             self._killall()
             exception = ex
             raise
@@ -232,7 +232,7 @@ class NativeRuntime(object):
 
         # assert that end was executed and it was successful
         if ('end', ()) in self._finished:
-            self._logger('Done!', system_msg=True)
+            self._logger.info('Done!')
         else:
             raise MetaflowInternalError('The *end* step was not successful '
                                         'by the end of flow.')
@@ -340,9 +340,11 @@ class NativeRuntime(object):
             if trans:
                 next_steps = trans[0]
                 foreach = trans[1]
+                condition = trans[2]
             else:
                 next_steps = []
                 foreach = None
+                condition = None
             expected = self._graph[task.step].out_funcs
             if next_steps != expected:
                 msg = 'Based on static analysis of the code, step *{step}* '\
@@ -363,6 +365,14 @@ class NativeRuntime(object):
             elif foreach:
                 # Next step is a foreach child
                 self._queue_task_foreach(task, next_steps)
+            elif condition:
+                print("TASK CONDITION ... ", task.results[condition])
+                condition_res = task.results[condition]
+                if condition_res:
+                    next_step = next_steps[0]
+                else:
+                    next_step = next_steps[1]
+                self._queue_push(next_step, {'input_paths': [task.path]})
             else:
                 # Next steps are normal linear steps
                 for step in next_steps:
@@ -374,6 +384,8 @@ class NativeRuntime(object):
                 worker = self._workers.get(event.fd)
                 if worker:
                     if event.can_read:
+                        # pass
+                        # yield task
                         worker.read_logline(event.fd)
                     if event.is_terminated:
                         returncode = worker.terminate()
@@ -441,8 +453,8 @@ class Task(object):
                  metadata,
                  environment,
                  entrypoint,
-                 event_logger,
-                 monitor,
+                #  event_logger,
+                #  monitor,
                  input_paths=None,
                  split_index=None,
                  clone_run_id=None,
@@ -472,8 +484,8 @@ class Task(object):
         self.clone_origin = None
         self.origin_ds_set = origin_ds_set
         self.metadata = metadata
-        self.event_logger = event_logger
-        self.monitor = monitor
+        # self.event_logger = event_logger
+        # self.monitor = monitor
 
         self._logger = logger
         self._path = '%s/%s/%s' % (self.run_id, self.step, self.task_id)
@@ -483,8 +495,9 @@ class Task(object):
         self.error_retries = 0
 
         self.tags = metadata.sticky_tags
-        self.event_logger_type = self.event_logger.logger_type
-        self.monitor_type = monitor.monitor_type
+        #self.event_logger_type = self.event_logger.logger_type
+        # self.event_logger_type = None
+        self.monitor_type = None
 
         self.metadata_type = metadata.TYPE
         self.datastore_type = datastore.TYPE
@@ -521,9 +534,9 @@ class Task(object):
                                    task_id=self.task_id,
                                    mode='w',
                                    metadata=self.metadata,
-                                   attempt=self.retries,
-                                   event_logger=self.event_logger,
-                                   monitor=self.monitor)
+                                   attempt=self.retries)
+                                #    event_logger=self.event_logger,
+                                #    monitor=self.monitor)
 
 
     def log(self, msg, system_msg=False, pid=None):
@@ -531,8 +544,9 @@ class Task(object):
             prefix = '[%s (pid %s)] ' % (self._path, pid)
         else:
             prefix = '[%s] ' % self._path
+        msg = prefix+"|"+msg
 
-        self._logger(msg, head=prefix, system_msg=system_msg)
+        self._logger.info(msg)
         sys.stdout.flush()
 
     def _find_origin_task(self, clone_run_id, join_type):
@@ -610,8 +624,8 @@ class Task(object):
                                                task_id=self.task_id,
                                                mode='r',
                                                metadata=self.metadata,
-                                               event_logger=self.event_logger,
-                                               monitor=self.monitor)
+                                               event_logger=self._logger)
+                                            #    monitor=self.monitor)
             return self._results_ds
 
     @property
@@ -704,8 +718,8 @@ class CLIArgs(object):
             'metadata': self.task.metadata_type,
             'environment': self.task.environment_type,
             'datastore': self.task.datastore_type,
-            'event-logger': self.task.event_logger_type,
-            'monitor': self.task.monitor_type,
+            # 'event-logger': self.task.event_logger_type,
+            # 'monitor': self.task.monitor_type,
             'datastore-root': self.task.datastore_sysroot,
             'with': [deco.make_decorator_spec() for deco in self.task.decos
                      if not deco.statically_defined]
@@ -821,6 +835,7 @@ class Worker(object):
         # readline() below should never block thanks to polling and
         # line buffering. If it does, things will deadlock
         line = fileobj.readline()
+        # print("LINE ...... ", line)
         if line:
             self.write(line, buf)
             return True
@@ -893,3 +908,4 @@ class Worker(object):
 
     def __str__(self):
         return 'Worker[%d]: %s' % (self._proc.pid, self.task.path)
+
