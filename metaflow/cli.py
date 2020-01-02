@@ -829,10 +829,12 @@ def start(ctx,
         sh = logging.StreamHandler(sys.stdout)
         sh.setLevel(logging.DEBUG)
         # create formatter and add it to the handlers
-        if cmd in ["run", "run-trigger"]:
-            formatter = logging.Formatter('%(asctime)s - %(message)s')
-        elif cmd == "step":
+        # if cmd in ["run", "run-trigger"]:
+            
+        if cmd == "step":
             formatter = logging.Formatter('%(message)s')
+        else:
+            formatter = logging.Formatter('%(asctime)s - %(message)s')
 
         # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         sh.setFormatter(formatter)
@@ -872,12 +874,13 @@ def start(ctx,
     logger = logging.getLogger('metaflow.2')
     logger.setLevel(logging.DEBUG)
     # create file handler which logs even debug messages
-    if ctx.invoked_subcommand in ["run", "run-trigger"]:
-        fh = logging.FileHandler('console.log', mode='w')
-        formatter = logging.Formatter('%(asctime)s - %(message)s')
-    elif ctx.invoked_subcommand == "step":
+
+    if ctx.invoked_subcommand == "step":
         fh = logging.FileHandler('console.log')
         formatter = logging.Formatter('%(message)s')
+    else:
+        fh = logging.FileHandler('console.log', mode='w')
+        formatter = logging.Formatter('%(asctime)s - %(message)s')
     
     fh.setLevel(logging.DEBUG)
     # create console handler with a higher log level

@@ -241,3 +241,65 @@ class LocalDataStore(MetaflowDataStore):
         filename = self.get_done_filename_for_attempt(self.attempt)
         path = os.path.join(self.root, filename)
         return os.path.exists(path)
+
+    @classmethod
+    def completed_step(cls,
+                         flow_name,
+                         run_id=None,
+                         step=None):
+        run_prefix = cls.make_path(flow_name, run_id)
+        
+        if os.path.exists(run_prefix):
+            task_prefixes = []
+            step_prefix = cls.make_path(flow_name, run_id, step)
+            try:
+                for task in os.listdir(step_prefix):
+                    if task == cls.METADATA_DIR:
+                        continue
+                    task_prefixes.append(
+                        cls.make_path(flow_name, run_id, step, task))
+            except FileNotFoundError as e:
+               return [{
+                            "step": step,
+                            "done": False
+                    }]
+
+            return_list = []
+            for task_prefix in task_prefixes:
+                step, task = task_prefix.split('/')[-2:]
+                #step_id = os.path.basename(task_prefix)
+                # Sort the file listing to iterate in increasing order of
+                # attempts.
+                latest_attempt = None
+                latest_done_attempt = None
+                try:
+                    for fname in sorted(os.listdir(task_prefix)):
+                        if cls.is_done_filename(fname):
+                            name, attempt = cls.parse_filename(fname)
+                            latest_done_attempt = attempt
+                            return_list.append(
+                                {
+                                "task_id": task,
+                                "step": step,
+                                "done": True
+                            })   
+                            #return res
+                            #res[str(step_id)] = True
+                            # Read the corresponding metadata file.
+                        elif cls.is_attempt_filename(fname):
+                            _, attempt = cls.parse_filename(fname)
+                            latest_attempt = attempt
+                except FileNotFoundError as e:
+                    res = return_list.append({
+                            "task_id": task,
+                            "step": step,
+                            "done": False
+                    })
+                # Only read the metadata if the latest attempt is also done.
+                #if latest_done_attempt is not None and\
+                #    latest_done_attempt == latest_attempt:
+                #    with open(latest_data_path) as f:
+                #        data_blobs.append((step, task, attempt, f.read()))
+            return return_list
+        else:
+            raise DataException("Couldn't find data at %s" % run_prefix)
