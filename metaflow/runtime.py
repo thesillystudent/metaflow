@@ -206,10 +206,10 @@ class NativeRuntime(object):
                     progress_tstamp = time.time()
                     msg = "%d tasks are running: %s." %\
                           (self._num_active_workers, 'e.g. ...')  # TODO
-                    self._logger(msg, system_msg=True)
+                    self._logger.info(msg)
                     msg = "%d tasks are waiting in the queue." %\
                           len(self._run_queue)
-                    self._logger(msg, system_msg=True)
+                    self._logger.info(msg)
                     msg = "%d steps are pending: %s." %\
                           (0, 'e.g. ...')  # TODO
                     self._logger.info(msg)
@@ -400,8 +400,8 @@ class NativeRuntime(object):
                             # worker did not finish successfully
                             if worker.killed or\
                                returncode == METAFLOW_EXIT_DISALLOW_RETRY:
-                                self._logger("This failed task will not be "
-                                             "retried.", system_msg=True)
+                                self._logger.info("This failed task will not be "
+                                             "retried.")
                             else:
                                 if task.retries < task.user_code_retries +\
                                         task.error_retries:

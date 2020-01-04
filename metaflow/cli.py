@@ -632,8 +632,8 @@ def run_trigger(obj,
     from .trigger_runtime import Runner
     while dq:
         trigger_args = deque_analyses_from_queue(dq)
-        # print(trigger_args["step_name"], trigger_args["input_paths"])
-        print(trigger_args)
+        print("TRIGGER ARGS ... ", trigger_args["step_name"], trigger_args["input_paths"], trigger_args["split_index"], trigger_args["join_type"])
+        # print(trigger_args)
         runner = Runner(**trigger_args)
         out_triggers = runner.execute()
         for out_trigger in out_triggers:

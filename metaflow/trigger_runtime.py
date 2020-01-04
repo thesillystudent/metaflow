@@ -2,6 +2,7 @@ from .task import MetaflowTask
 from .metaflow_config import DEFAULT_DATASTORE, DEFAULT_METADATA
 from .datastore.local import LocalDataStore
 from .metadata.local import LocalMetadataProvider
+from .metadata import TriggerLocalMetadataProvider
 from .environment import MetaflowEnvironment
 from . import decorators
 from .graph import FlowGraph
@@ -14,6 +15,9 @@ from .exception import MetaflowInternalError
 def metadata_factory(mtype):
     if mtype == "local":
         return LocalMetadataProvider
+    elif mtype == "local-trigger":
+        return TriggerLocalMetadataProvider
+       
 
 def datastore_factory(dtype):
     if dtype == "local":
@@ -32,9 +36,6 @@ def flow_factory(flow):
     elif flow == "TestParameterFlow":
         from .test_parameter import TestParameterFlow
         return TestParameterFlow(use_cli=False)
-    elif flow == "TestForkJoin2":
-        from .test_flows import TestForkJoin2
-        return TestForkJoin2(use_cli=False)
     elif flow == "HelloFlow":
         from .flows.hello_world import HelloFlow
         return HelloFlow(use_cli=False)
@@ -157,7 +158,11 @@ class Runner(object):
         task = self._new_task(self._step_name, self._input_paths)
         task.run()
         triggers_list = self.on_complete(task)
-        print("Step {} is spawning {} steps/tasks ".format(self._step_name, [s['step_name']+"/"+str(s["split_index"])+" --- "+str(s['input_paths']) for s in triggers_list]))
+        print("ORIGIN TASK: ", self._step_name)
+        for s in triggers_list:
+            print(
+                "SPAWNING : {} steps/tasks ".format(s['step_name']+"/"+str(s["split_index"])+" --- "+str(s['input_paths']))
+                ) 
         return triggers_list
 
     def on_complete(self, task):
@@ -270,7 +275,7 @@ class Runner(object):
             #required_tasks = [self._finished.get((step, foreach_stack))
             #                 for step in self._graph[next_step].in_funcs]
             required_steps = [step for step in self._graph[next_step].in_funcs]
-            #print("REQUIRED .... " ,required_steps)
+            print("REQUIRED .... " ,required_steps)
             required_tasks = []
             input_paths = []
             for step in required_steps:
@@ -279,17 +284,32 @@ class Runner(object):
                     run_id=self._run_id,
                     step=step)
                 # Check if any attempt is successfully completed
-                completed_task = [item for item in res if item["done"] == True]
+                completed_tasks = [item for item in res if item["done"] == True]
 
-                if not completed_task:
+                if not completed_tasks:
                     return []
 
-                completed_task = completed_task[0]
+                required_completed_task = None
+
+                for completed_task in completed_tasks:
+                    completed_task_store = self._datastore(self._flow.name,
+                                               run_id=self._run_id,
+                                               step_name=step,
+                                               task_id=completed_task.get("task_id"),
+                                               mode='r',
+                                               metadata=self._metadata,
+                                               event_logger=self._logger)
+                    if task.finished_id[1] == tuple(completed_task_store['_foreach_stack']):
+                        required_completed_task = completed_task
+
+                if not required_completed_task:
+                    return []
         
-                required_tasks.append(completed_task)
-                input_paths.append('%s/%s/%s' % (self._run_id, step, completed_task.get("task_id")))
+                required_tasks.append(required_completed_task)
+                print('%s/%s/%s' % (self._run_id, step, required_completed_task.get("task_id")))
+                input_paths.append('%s/%s/%s' % (self._run_id, step, required_completed_task.get("task_id")))
             required_tasks = [res["done"] for res in required_tasks]
-            join_type = 'linear'
+            join_type = 'split-and'
 
             if all(required_tasks):
                 # all tasks to be joined are ready. Schedule the next join step.

@@ -33,7 +33,6 @@ class MetaflowTask(object):
                  console_logger):
                 #  event_logger,
                 #  monitor):
-        print(console_logger)
         self.flow = flow
         self.datastore = datastore
         self.metadata = metadata
@@ -45,7 +44,6 @@ class MetaflowTask(object):
         self.console_logger = console_logger
         # self.event_logger = event_logger
         # self.monitor = monitor
-        print("LAALLALLALALALALALLALALALLALALALALLALA")
 
     def _exec_step_function(self, step_function, input_obj=None):
         self.environment.validate_environment(logger=self.console_logger)

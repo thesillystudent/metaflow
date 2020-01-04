@@ -2,9 +2,11 @@ import glob
 import json
 import os
 import time
+import diskcache
 
 from metaflow.metaflow_config import DATASTORE_LOCAL_DIR
 from .local import LocalMetadataProvider
+CACHE_DIRECTORY= "/tmp/kurmaflow_task_ids"
 
 
 class TriggerLocalMetadataProvider(LocalMetadataProvider):
