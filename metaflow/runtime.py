@@ -110,7 +110,7 @@ class NativeRuntime(object):
             # (see PREFETCH_DATA_ARTIFACTS) so that the entire runtime can
             # access the relevant data from cache (instead of going to the datastore
             # after the first prefetch).
-            logger(
+            logger.info(
                 'Gathering required information to resume run (this may take a bit of time)...')
             self._origin_ds_set = \
                 MetaflowDatastoreSet(
@@ -118,9 +118,9 @@ class NativeRuntime(object):
                     flow.name,
                     clone_run_id,
                     metadata=metadata,
-                    logger=logger,
-                    # event_logger=event_logger,
-                    monitor=monitor,
+                    # logger=logger,
+                    event_logger=logger,
+                    # monitor=monitor,
                     prefetch_data_artifacts=PREFETCH_DATA_ARTIFACTS)
         self._run_queue = []
         self._poll = procpoll.make_poll()
@@ -800,7 +800,7 @@ class Worker(object):
         if self.task.is_cloned and self.task.clone_origin:
             args.command_options['clone-only'] = self.task.clone_origin
             # disabling atlas sidecar for cloned tasks due to perf reasons
-            args.top_level_options['monitor'] = 'nullSidecarMonitor'
+            # args.top_level_options['monitor'] = 'nullSidecarMonitor'
         else:
             # decorators may modify the CLIArgs object in-place
             for deco in self.task.decos:
