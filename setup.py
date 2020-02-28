@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-version = '2.0.0'
+version = '2.0.2'
 
 setup(name='metaflow',
       version=version,
@@ -16,7 +16,7 @@ setup(name='metaflow',
         metaflow=metaflow.main_cli:main
       ''',
       install_requires = [
-        'click',
+        'click>=7.0',
         'requests',
         'boto3'
       ],

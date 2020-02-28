@@ -4,7 +4,6 @@ import sys
 import time
 from hashlib import sha1
 from functools import partial
-from collections import Sequence
 
 try:
     # Python 2
@@ -329,7 +328,7 @@ class MetaflowDataStore(object):
                                 "Try with a different --run-id.")
         if self.datastore_root is None:
             raise DataException("Datastore root not found. "
-                                "Specify with DATASTORE_SYSROOT_%s "
+                                "Specify with METAFLOW_DATASTORE_SYSROOT_%s "
                                 "environment variable." % self.TYPE.upper())
         
         self.event_logger = event_logger

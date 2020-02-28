@@ -1,4 +1,3 @@
-import collections
 import os
 import sys
 from hashlib import sha1
@@ -24,6 +23,11 @@ from metaflow.datatools import S3
 from . import read_conda_manifest, write_to_conda_manifest
 from .conda import Conda
 
+try:
+    unicode
+except NameError:
+    unicode = str
+    basestring = str
 
 class CondaStepDecorator(StepDecorator):
     """
@@ -79,8 +83,11 @@ class CondaStepDecorator(StepDecorator):
         base_deps = self.base_attributes['libraries']
         deps.update(base_deps)
         step_deps = self.attributes['libraries']
-        if isinstance(step_deps, collections.Mapping):
-            deps.update(step_deps)
+        if isinstance(step_deps, (unicode, basestring)):
+            step_deps = step_deps.strip('"{}\'')
+            if step_deps:
+                step_deps = dict(map(lambda x: x.strip().strip('"\''), a.split(':')) for a in step_deps.split(','))
+        deps.update(step_deps)
         return deps
 
     def _step_deps(self):
@@ -137,10 +144,15 @@ class CondaStepDecorator(StepDecorator):
                                 url.path.lstrip('/'),
                                 package_info['md5'],
                                 package_info['fn'])
-            #The tarball maybe missing when user invokes `conda clean`!
             tarball_path = package_info['package_tarball_full_path']
-            if os.path.isdir(package_info['package_tarball_full_path']):
-                tarball_path = '%s.tar.bz2' % package_info['package_tarball_full_path']
+            if tarball_path.endswith('.conda'):
+                #Conda doesn't set the metadata correctly for certain fields
+                # when the underlying OS is spoofed.
+                tarball_path = tarball_path[:-6]
+            if not tarball_path.endswith('.tar.bz2'):
+                tarball_path = '%s.tar.bz2' % tarball_path
+            if not os.path.isfile(tarball_path):
+                #The tarball maybe missing when user invokes `conda clean`!
                 to_download.append((package_info['url'], tarball_path))
             files.append((path, tarball_path))
         if to_download:
